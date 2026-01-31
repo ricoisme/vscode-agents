@@ -1,0 +1,2 @@
+chardet>=5.1.0; extra
+langdetect>=1.0.9; extra
