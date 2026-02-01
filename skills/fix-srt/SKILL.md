@@ -1,16 +1,17 @@
 ---
 title: fix-srt
-applyTo: '**/*.srt'
+applyTo: '**/*.{srt,vtt}'
 description: |
-  建立一個 Skill 用於自動修正 SRT 字幕中不合理的時間軸、重複或錯誤的編號，
+  建立一個 Skill 用於自動修正 SRT / VTT 字幕檔案中不合理的時間軸、重複或錯誤的編號，
   並根據語言自動判斷後套用語意式文字校正（grammar / punctuation / 輕微重寫），
-  以保留上下文語意為優先。
+  以保留上下文語意為優先。支援 SRT 與 WebVTT (VTT) 兩種格式。
 ---
 
 # fix-srt Skill
 
 目的
-- 自動修正 SRT 檔案中的常見問題：編號錯誤、時間重疊或長度為 0 的段落、時間間隔不連續。
+- 自動修正 SRT / VTT 字幕檔案中的常見問題：編號錯誤、時間重疊或長度為 0 的段落、時間間隔不連續。
+- 支援 SRT (SubRip) 與 WebVTT (VTT) 兩種字幕格式，自動偵測檔案類型並套用對應的解析與輸出邏輯。
 - 根據段落上下文自動判斷語言（例如繁體中文、簡體中文、英文等），並使用語意校正來修正文句（詞彙、標點、大小寫、常見拼字錯誤），但不改變原始語意。
 
 主要功能
@@ -23,7 +24,7 @@ description: |
 
 使用情境與範例
 
-正確範例
+正確範例（SRT 格式）
 ```
 79
 00:03:21,000 --> 00:03:22,000
@@ -35,6 +36,20 @@ Create
 
 81
 00:03:23,000 --> 00:03:25,000
+Redmi的Pump
+```
+
+正確範例（VTT 格式）
+```
+WEBVTT
+
+00:03:21.000 --> 00:03:22.000
+可以呼叫這個
+
+00:03:22.000 --> 00:03:23.000
+Create
+
+00:03:23.000 --> 00:03:25.000
 Redmi的Pump
 ```
 
@@ -61,24 +76,37 @@ Redmi的Pump
 - 推薦語言：Python（兼容性高、第三方套件豐富）。
 - 推薦套件：
   - `srt`（解析 / 序列化 SRT）
+  - `webvtt-py`（解析 / 序列化 WebVTT）
   - `langdetect` 或 `fasttext`（語言偵測）
   - `regex`（更靈活的文字處理）
   - 可選：`openai` 或本地 transformers 模型（進行語意式校正）
+- 格式偵測：根據檔案副檔名或檔頭（`WEBVTT`）自動判斷格式類型
 
 範例 CLI（示意）
-```
+```bash
 # 安裝建議套件
-python -m pip install srt langdetect regex
+python -m pip install srt webvtt-py langdetect regex
 
-# 簡單用法：在本地執行修正並輸出新檔
+# 簡單用法：在本地執行修正並輸出新檔（自動偵測格式）
 python fix_srt.py --input input.srt --output input.fixed.srt --min-duration 0.5 --language-auto
+
+# VTT 格式範例
+python fix_srt.py --input input.vtt --output input.fixed.vtt --min-duration 0.5 --language-auto
 
 # 使用外部 LLM 進階校正（需設定 API_KEY）
 python fix_srt.py --input input.srt --output input.fixed.srt --use-llm openai --llm-model gpt-4o
+
+# 批次處理多個檔案（支援混合 SRT/VTT）
+python fix_srt.py --input-dir ./docs/srts --output-dir ./docs/srts_fixed --recursive
 ```
 
 設計細節（行為規則）
-- 重新編號規則：除非 CLI 指定保留原始起始數字，預設從 1 重新編號。
+- **格式處理差異**：
+  - SRT：編號序列必須存在，時間格式為 `HH:MM:SS,mmm`
+  - VTT：編號可選（僅 cue identifier），時間格式為 `HH:MM:SS.mmm`，須保留檔頭 `WEBVTT`
+- 重新編號規則：
+  - SRT：除非 CLI 指定保留原始起始數字，預設從 1 重新編號
+  - VTT：保留原始 cue identifier（若存在），或可選擇性加入編號
 - 最小段落長度：預設 0.5 秒，可由 `--min-duration` 調整。
 - 合併策略：若相鄰段落各自 < 1 秒且語句顯然中斷（例如結尾非標點），則嘗試合併。
 - 時間分配：對於長度為 0 的短段，嘗試從前後段取得時間切分；若失敗則設定最小長度並將鄰段往後推移以避免衝突（保守調整，不會把後段推超過下一段開始時刻）。
@@ -89,12 +117,20 @@ python fix_srt.py --input input.srt --output input.fixed.srt --use-llm openai --
 - 對於敏感或私有影音，提醒使用者注意資料隱私（例如不要上傳到第三方服務，或使用內部模型）。
 
 輸出與驗證
-- 輸出檔案為合法 SRT，可由播放器或 `srt` 套件驗證。
+- 輸出檔案為合法 SRT 或 VTT（根據輸入格式或指定格式），可由播放器或對應套件驗證。
+- 格式轉換：可選擇性支援 `--output-format` 參數進行格式互轉（例如 SRT → VTT 或 VTT → SRT）。
 - 建議提供 `--dry-run` 模式，輸出要做的變更摘要（編號調整、合併、時間調整）供人工審核。
+- VTT 特定驗證：確保檔頭 `WEBVTT` 存在，時間格式使用小數點（`.`）而非逗號（`,`）。
 
 測試建議
-- 建立一組樣本 SRT（含邊界案例：時間為 0、重疊、長段分割、不同語言）、對照輸出檔作為測試集。
-- 單元測試：時間修正邏輯、合併判斷、編號重排、語言偵測結果。
+- 建立一組樣本 SRT 與 VTT（含邊界案例：時間為 0、重疊、長段分割、不同語言）、對照輸出檔作為測試集。
+- 單元測試：
+  - 時間修正邏輯（SRT 與 VTT 格式）
+  - 合併判斷
+  - 編號重排（SRT 強制編號、VTT 可選編號）
+  - 語言偵測結果
+  - 格式互轉驗證（SRT ↔ VTT）
+- 整合測試：使用真實字幕檔案（例如 `docs/srts/*.srt` 與 `docs/srts/*.vtt`）進行端對端測試。
 
 
 
