@@ -19,6 +19,7 @@ description: |
 4. **語意連貫性**：修飾斷句不當、口語贅詞、或跳針重複的語句，保持前後文邏輯一致。
 5. **排版標準化**：執行「盤古之白」(中英間距) 並優化標點符號。
 6. **回饋學習**：主動識別錯誤規律並產出字典更新建議。
+7. **建立修正檔案**: 輸出修正後的 SRT/VTT 字幕檔案，確保格式正確且可直接使用。
 
 ## 🛠 Skills & Logic
 
@@ -37,7 +38,7 @@ description: |
 
 ### 1. 字典式校正 (Dictionary-Based Correction)
 **第二執行**：在時間軸修正後，優先套用 `typo_map.json` 字典檔：
-- **載入字典**：讀取 `.github/skills/fix-srt/scripts/typo_map.json` 中的錯字對照表。
+- **載入字典**：讀取 `.github/skills/fix-srt/resources/typo_map.json` 中的錯字對照表。
 - **批次取代**：對所有字幕文字進行全域搜尋與取代（case-sensitive）。
 - **常見對照範例**：
   ```json
@@ -84,7 +85,7 @@ description: |
    - 若有跳號或重複，自動重新編號。
 
 3. **載入字典並執行批次校正**：
-   - 讀取 `.github/skills/fix-srt/scripts/typo_map.json`。
+   - 讀取 `.github/skills/fix-srt/resources/typo_map.json`。
    - 對所有字幕文字進行字典式取代（錯字 → 正確字）。
    - 記錄取代次數與位置，供後續驗證。
 
@@ -101,6 +102,7 @@ description: |
 6. **字典回饋提取**：
    - 識別本次修正中**未被字典涵蓋**但具有通用價值的「錯字對照」。
    - 產出 JSON 格式的字典更新建議，供後續合併至 `typo_map.json`。
+7. **輸出修正後的字幕檔案**，確保格式正確且可直接使用*.fixed.srt 或 *.fixed.vtt。
 
 ## 📥 Output Format
 請依序輸出以下內容：
