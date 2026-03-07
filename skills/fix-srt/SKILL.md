@@ -1,6 +1,5 @@
 ---
-title: fix-srt
-applyTo: '**/*.{srt,vtt}'
+name: fix-srt
 description: |
   自動修正 SRT / VTT 字幕檔案中不合理的時間軸、重複或錯誤的編號，
   並根據語言自動判斷後套用語意式文字校正（grammar / punctuation / 輕微重寫），
