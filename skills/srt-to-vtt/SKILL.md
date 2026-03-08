@@ -1,5 +1,5 @@
 ---
-title: srt-to-vtt
+name: srt-to-vtt
 description : 提供一個可重用的 skill，用於指導使用者將 SRT 格式字幕轉換為 VTT（WebVTT）格式。此 skill 支援多語言（英文、繁體中文、簡體中文），並示範如何使用現成的 `srt-to-vtt` Python 套件與備選工具進行完整轉換與格式/編碼自動偵測。
 ---
 
