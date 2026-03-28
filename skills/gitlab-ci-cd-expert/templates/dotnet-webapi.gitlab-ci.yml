@@ -1,0 +1,102 @@
+stages:
+  - restore
+  - build
+  - test
+  - deploy
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+default:
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  retry: 1
+  interruptible: true
+  before_script:
+    - dotnet --info
+  cache:
+    key:
+      files:
+        - MyWebApi8/MyWebApi8.csproj
+        - MyTests/MyTests.csproj
+    paths:
+      - .nuget/packages/
+    policy: pull-push
+
+variables:
+  SOLUTION_PATH: MyWebApi8.sln
+  WEB_PROJECT_PATH: MyWebApi8/MyWebApi8.csproj
+  TEST_PROJECT_PATH: MyTests/MyTests.csproj
+  BUILD_CONFIGURATION: Release
+  PUBLISH_DIR: out/publish
+  TEST_RESULTS_DIR: out/test-results
+  NUGET_PACKAGES: $CI_PROJECT_DIR/.nuget/packages
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+restore:
+  stage: restore
+  script:
+    - dotnet restore "$SOLUTION_PATH" --packages "$NUGET_PACKAGES"
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - MyWebApi8/obj/
+      - MyTests/obj/
+
+build:
+  stage: build
+  needs:
+    - job: restore
+      artifacts: true
+  script:
+    - dotnet build "$SOLUTION_PATH" --configuration "$BUILD_CONFIGURATION" --no-restore
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - MyWebApi8/bin/Release/
+      - MyWebApi8/obj/
+      - MyTests/bin/Release/
+      - MyTests/obj/
+
+test:
+  stage: test
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - mkdir -p "$TEST_RESULTS_DIR"
+    - dotnet test "$TEST_PROJECT_PATH" --configuration "$BUILD_CONFIGURATION" --no-build -p:RunSettingsFilePath= --logger "trx;LogFileName=test-results.trx" --logger "junit;LogFilePath=${CI_PROJECT_DIR}/${TEST_RESULTS_DIR}/junit-test-results.xml" --results-directory "$TEST_RESULTS_DIR"
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - out/test-results/
+    reports:
+      junit: out/test-results/junit-test-results.xml
+
+deploy:
+  stage: deploy
+  needs:
+    - job: build
+      artifacts: true
+    - job: test
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+    - when: never
+  environment:
+    name: production
+  script:
+    - mkdir -p "$PUBLISH_DIR"
+    - dotnet publish "$WEB_PROJECT_PATH" --configuration "$BUILD_CONFIGURATION" --no-build --output "$PUBLISH_DIR"
+    - echo "Publish artifact created at $PUBLISH_DIR. Replace this step with your real deployment command once target environment variables are defined."
+  artifacts:
+    expire_in: 7 days
+    paths:
+      - out/publish/
